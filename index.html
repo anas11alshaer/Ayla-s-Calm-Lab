@@ -2,32 +2,56 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- Viewport: user-scalable=no prevents pinch-zoom, making it feel more like a native app -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  
+  <!-- iOS & PWA Meta Tags for "Add to Home Screen" functionality -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ayla's Lab">
+  <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherry-blossom_1f338.png"> <!-- A lovely cherry blossom icon -->
+  <link rel="manifest" href="manifest.json" crossorigin="anonymous">
+
   <title>Ayla's Calm Lab</title>
   <style>
+    html {
+      font-size: clamp(16px, 2vw, 22px);
+    }
     html, body {
       margin: 0; padding: 0;
       width: 100vw; height: 100vh;
       overflow: hidden;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(to bottom right, #e0f7fa, #fce4ec);
+      transition: all 0.3s ease-in-out;
+      -webkit-tap-highlight-color: transparent; /* Removes blue tap highlight on iOS */
     }
     .container {
       position: relative;
       width: 100%; height: 100%;
       display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
     }
     #passcode-screen {
       position: absolute;
       width: 100%; height: 100%;
       display: flex; flex-direction: column;
       justify-content: center; align-items: center;
-      z-index: 10;
+      z-index: 20;
       background: rgba(255, 255, 255, 0.8);
+      text-align: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    #intro-msg {
+      font-size: 1.1em; color: #444;
+      margin-bottom: 20px;
     }
     input[type="password"] {
       padding: 12px; font-size: 1.2em;
       border-radius: 8px; border: 1px solid #ccc;
+      transition: all 0.3s ease-in-out;
+      margin-bottom: 5px;
     }
     button {
       margin-top: 12px; padding: 10px 20px;
@@ -35,40 +59,92 @@
       border: none; border-radius: 8px;
       background: #81d4fa; color: #fff;
       cursor: pointer;
+      transition: all 0.3s ease-in-out;
+      touch-action: manipulation; /* Improves touch responsiveness */
     }
-    #error-msg { margin-top: 8px; color: #e53935; }
-
+    button:hover:not(:disabled) {
+      background: #4fc3f7;
+    }
+    button:active:not(:disabled) {
+      transform: scale(0.97); /* Instant feedback on tap */
+      transition: transform 0.1s;
+    }
+    button:disabled {
+      background: #b0bec5;
+      cursor: not-allowed;
+    }
+    #error-msg {
+      margin-top: 8px; color: #e53935;
+    }
+    .shake {
+      animation: shake 0.4s ease;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
     canvas {
       position: absolute; top: 0; left: 0;
       width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 1;
     }
-    #heartCanvas {
-      animation: beatCanvas 1s ease-in-out infinite;
-      transform-origin: center center;
+    #heartContainer {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       z-index: 5;
-      opacity: 0;
-      transition: opacity 1s ease-in-out;
+      position: absolute;
+      width: 100%; height: 100%;
     }
-    @keyframes beatCanvas {
-      0%,100% { transform: scale(1); }
-      50%     { transform: scale(1.1); }
+    .heart {
+      width: 150px;
+      height: 150px;
+      background: radial-gradient(circle at 30% 30%, #f06292, #e53935);
+      position: relative;
+      transform: rotate(-45deg);
+      box-shadow: 0 0 30px rgba(229,57,53, 0.5);
+      animation: pulse 2s infinite;
+      cursor: pointer;
+      touch-action: manipulation;
     }
-
-    .hearts-bg {
-      position: absolute; width: 100%; height: 100%;
-      pointer-events: none; overflow: hidden; z-index: 0;
+    .heart::before,
+    .heart::after {
+      content: "";
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      background: inherit;
+      border-radius: 50%;
+    }
+    .heart::before { top: -75px; left: 0; }
+    .heart::after { left: 75px; top: 0; }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1) rotate(-45deg); }
+      50% { transform: scale(1.1) rotate(-45deg); }
+    }
+    .bounce { animation: bounce 0.6s ease-in-out; }
+    @keyframes bounce {
+      0%   { transform: scale(1) rotate(-45deg); }
+      25%  { transform: scale(1.3) rotate(-45deg); }
+      50%  { transform: scale(0.95) rotate(-45deg); }
+      75%  { transform: scale(1.05) rotate(-45deg); }
+      100% { transform: scale(1) rotate(-45deg); }
+    }
+    #heartsBg {
+        position: absolute; width: 100%; height: 100%;
+        pointer-events: none; overflow: hidden; z-index: 0;
     }
     .floating-heart {
       position: absolute; bottom: -30px;
-      width: 20px; height: 20px;
-      background: #e57373; transform: rotate(-45deg);
+      background: #f06292; transform: rotate(-45deg);
       opacity: 0.8; animation: floatUp 6s linear infinite;
+      border-radius: 50% 50% 50% 0;
     }
-    .floating-heart::before,
-    .floating-heart::after {
-      content: ''; position: absolute;
-      width: 20px; height: 20px;
-      background: #e57373; border-radius: 50%;
+    .floating-heart::before, .floating-heart::after {
+      content: ''; position: absolute; background: inherit; border-radius: 50%;
     }
     .floating-heart::before { top: -10px; left: 0; }
     .floating-heart::after  { left: 10px; top: 0; }
@@ -77,179 +153,120 @@
       10%  { opacity: 0.8; }
       100% { transform: translateY(-120vh) scale(1.1) rotate(-45deg); opacity: 0; }
     }
-
-    /* Options styling */
     #options {
-      position: absolute; bottom: 10%; left: 50%;
-      transform: translate(-50%, 20px);
-      opacity: 0; display: flex; gap: 20px;
+      margin-top: 40px; display: flex;
+      flex-wrap: wrap; justify-content: center; /* Allow wrapping on small screens */
+      gap: 15px; /* Adjusted gap */
+      opacity: 0; transform: translateY(20px);
       transition: opacity 1s ease, transform 1s ease;
-      z-index: 10;
     }
     #options.visible {
-      opacity: 1; transform: translate(-50%, 0);
+      opacity: 1; transform: translateY(0);
     }
     .option {
-      background: rgba(255,255,255,0.9);
-      padding: 12px 20px; border-radius: 8px;
-      font-size: 1.2em; color: #333;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      transition: transform 0.3s;
+      padding: 12px 20px; background: rgba(255,255,255,0.9);
+      border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      cursor: pointer; font-size: 1em; color: #333;
+      transition: transform 0.3s, box-shadow 0.3s;
+      touch-action: manipulation;
     }
-    .option:hover { transform: scale(1.05); }
-
-    /* Overlay for explicit play button (Safari and fallback) */
-    #musicOverlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.75);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 50;
+    .option:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 10px rgba(255,182,193, 0.5);
     }
-    #musicOverlay button {
-      padding: 14px 28px;
-      font-size: 1.4em;
-      border-radius: 8px;
-      border: none;
-      background: #81d4fa;
-      color: #fff;
-      cursor: pointer;
+    .option:active {
+      transform: scale(0.95); /* Instant feedback on tap */
     }
-
-    /* Hidden yet valid YT player (≥200×140 px, not display:none) */
-    #hiddenYT {
-      position: fixed;
-      left: -9999px; top: 0;
-      width: 240px; height: 180px;
-      pointer-events: none;
-      opacity: 0;
+    #message {
+      margin-top: 30px; font-size: 1.2em; color: #d32f2f;
+      text-align: center; padding: 0 15px;
+      opacity: 0; transition: opacity 1.5s ease-in-out;
+    }
+    #message.visible {
+      opacity: 1;
     }
   </style>
 </head>
 <body>
+  <div id="heartsBg"></div>
   <div class="container">
     <div id="passcode-screen">
+      <div id="intro-msg">A magical place made just for you...</div>
       <h1>Welcome to Ayla's Calm Lab 🌸</h1>
       <input type="password" id="passcode" placeholder="Enter your passcode">
       <button id="enterBtn">Enter</button>
+      <button id="playMusicBtn">▶ Play Music</button>
       <p id="error-msg"></p>
     </div>
 
     <canvas id="treeCanvas"></canvas>
-    <canvas id="heartCanvas"></canvas>
-    <div class="hearts-bg" id="heartsBg"></div>
 
-    <div id="options">
-      <div class="option" id="opt-motivation">My Motivation for YOU</div>
-      <div class="option" id="opt-energy">A Boost of Energy</div>
-      <div class="option" id="opt-heart">You can have my HEART</div>
+    <div id="heartContainer">
+      <div class="heart" id="heart"></div>
+      <div id="options">
+        <div class="option" id="opt-motivation">My Motivation for YOU</div>
+        <div class="option" id="opt-energy">A Boost of Energy</div>
+        <div class="option" id="opt-heart">You can have my HEART</div>
+      </div>
+      <div id="message">You're stronger than you think. I'll always be here for you! 💖</div>
     </div>
   </div>
 
   <script>
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const passcode = "2607";
+    let branchLines = [];
 
-    document.addEventListener('DOMContentLoaded', () => {
-      /* ——— floating hearts ——— */
-      const hb = document.getElementById('heartsBg');
-      for (let i = 0; i < 30; i++) {
-        const h = document.createElement('div');
-        h.className = 'floating-heart';
-        h.style.left = `${Math.random()*100}vw`;
-        h.style.animationDelay = `${Math.random()*6}s`;
-        h.style.animationDuration = `${5+Math.random()*4}s`;
-        hb.appendChild(h);
+    document.addEventListener("DOMContentLoaded", () => {
+      spawnFloatingHearts();
+    
+      document.getElementById("enterBtn").addEventListener("click", checkPasscode);
+      document.getElementById("passcode").addEventListener("keyup", (e) => {
+        if (e.key === "Enter") checkPasscode();
+      });
+
+      document.getElementById('playMusicBtn').addEventListener('click', () => {
+        playMusic();
+        const btn = document.getElementById('playMusicBtn');
+        btn.textContent = 'Music Playing ✅';
+        btn.disabled = true;
+      });
+
+      const heart = document.getElementById("heart");
+      // Use touchend for more immediate response on touch devices
+      heart.addEventListener("click", triggerBounce);
+      heart.addEventListener("touchend", triggerBounce);
+
+      function triggerBounce(e) {
+        e.preventDefault(); // Prevent ghost clicks on touch devices
+        heart.classList.remove("bounce");
+        void heart.offsetWidth; // Trigger reflow
+        heart.classList.add("bounce");
       }
 
-      /* Enter key on input */
-      document.getElementById('passcode')
-        .addEventListener('keyup', e => { if (e.key==='Enter') checkPasscode(); });
-
-      /* Enter button */
-      document.getElementById('enterBtn').addEventListener('click', checkPasscode);
-
-      /* Option links */
-      document.getElementById('opt-motivation')
-        .addEventListener('click', () => window.open(
-          'https://www.youtube.com/watch?v=uvDsgjRdoKo','_blank'));
-      document.getElementById('opt-energy')
-        .addEventListener('click', () => window.open(
-          'https://www.instagram.com/reel/DH8KlgWMIGX/?utm_source=ig_web_copy_link','_blank'));
-      document.getElementById('opt-heart')
-        .addEventListener('click', () => window.open(
-          'https://drive.google.com/file/d/1i2LOYxns-E3Ac7cB3WAbivERKqeWEuy1/view?usp=drive_link','_blank'));
-
-      /* Handle resize */
-      window.addEventListener('resize', () => {
-        clearTimeout(window._resizeTimeout);
-        window._resizeTimeout = setTimeout(() => {
-          if (!document.getElementById('passcode-screen').offsetParent) {
-            animateTree(); drawHeartOutline();
-          }
-        }, 150);
-      });
+      document.getElementById('opt-motivation').addEventListener('click', () => window.open('https://www.youtube.com/watch?v=uvDsgjRdoKo','_blank'));
+      document.getElementById('opt-energy').addEventListener('click', () => window.open('https://www.instagram.com/reel/DH8KlgWMIGX/?utm_source=ig_web_copy_link','_blank'));
+      document.getElementById('opt-heart').addEventListener('click', () => window.open('https://drive.google.com/file/d/1i2LOYxns-E3Ac7cB3WAbivERKqeWEuy1/view?usp=drive_link','_blank'));
     });
 
     function checkPasscode() {
-      const inp = document.getElementById('passcode');
-      const err = document.getElementById('error-msg');
-      if (inp.value === '2607') {
-        document.getElementById('passcode-screen').style.display = 'none';
-        startAnimation();
+      const input = document.getElementById("passcode");
+      const error = document.getElementById("error-msg");
+      if (input.value === passcode) {
+        document.getElementById("passcode-screen").style.display = "none";
+        document.getElementById("heartContainer").style.display = "flex";
+        animateTree();
       } else {
-        err.textContent = 'Wrong mixture! Try again 💊';
+        error.textContent = "Wrong mixture! Try again 💊";
+        error.classList.add("shake");
+        setTimeout(() => error.classList.remove("shake"), 400);
       }
     }
 
-    function startAnimation() {
-      animateTree();
-
-      /* All browsers need a user gesture; Safari additionally needs an explicit click */
-      if (isSafari) {
-        showPlayOverlay();
-      } else {
-        injectYT();
-      }
-    }
-
-    function showPlayOverlay() {
-      const overlay = document.createElement('div');
-      overlay.id = 'musicOverlay';
-      const btn = document.createElement('button');
-      btn.textContent = '▶ Play Music';
-      btn.onclick = () => {
-        injectYT();
-        document.body.removeChild(overlay);
-      };
-      overlay.appendChild(btn);
-      document.body.appendChild(overlay);
-    }
-
-    /* —— MUSIC: hidden‑but‑valid YT iframe —— */
-    function injectYT() {
-      if (document.getElementById('hiddenYT')) return; // already injected
-      const ifr = document.createElement('iframe');
-      ifr.id = 'hiddenYT';
-      ifr.width  = '240';
-      ifr.height = '180';
-      ifr.allow  = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
-      ifr.src =
-        'https://www.youtube.com/embed/oozQ4yV__Vw' +
-        '?autoplay=1' +
-        '&loop=1&playlist=oozQ4yV__Vw' +
-        '&controls=0&modestbranding=1&playsinline=1';
-      document.body.appendChild(ifr);
-    }
-
-    /* ——— Tree & Heart Drawing Logic (unchanged) ——— */
-
-    let branchLines = [], heartLines = [];
-
+    /* --- Tree Drawing Logic --- */
     function animateTree() {
       const c = document.getElementById('treeCanvas'),
             ctx = c.getContext('2d'),
             dpr = window.devicePixelRatio||1;
-      c.style.width = '100%'; c.style.height = '100%';
       c.width  = c.clientWidth  * dpr;
       c.height = c.clientHeight * dpr;
       ctx.scale(dpr, dpr);
@@ -275,7 +292,6 @@
         if (i >= branchLines.length) {
           clearInterval(iv);
           drawTreeFoliage();
-          drawHeartOutline();
           return;
         }
         const [x1,y1,x2,y2] = branchLines[i++];
@@ -288,12 +304,13 @@
 
     function drawTreeFoliage() {
       const foliage = [];
-      branchLines.forEach(([x1,y1,x2,y2]) => {
+      branchLines.forEach(([,,x2,y2]) => {
         if (Math.random() < 0.4) foliage.push({x:x2, y:y2, type:'leaf'});
         if (Math.random() < 0.2) foliage.push({x:x2, y:y2, type:'lily'});
       });
       animateFoliage(foliage);
       document.getElementById('options').classList.add('visible');
+      document.getElementById('message').classList.add('visible');
     }
 
     function animateFoliage(items) {
@@ -333,88 +350,30 @@
       });
     }
 
-    function drawHeartOutline() {
-      heartLines = [];
-      const c = document.getElementById('heartCanvas'),
-            ctx = c.getContext('2d'),
-            dpr = window.devicePixelRatio||1;
-      c.style.width  = '100%';
-      c.style.height = '100%';
-      c.width  = c.clientWidth  * dpr;
-      c.height = c.clientHeight * dpr;
-      ctx.scale(dpr, dpr);
-
-      const cw= c.clientWidth, cy= c.clientHeight,
-            cx= cw/2, cy2= cy/2, scale=1.5;
-      function sample(p0,p1,p2,p3,steps){
-        const pts=[];
-        for (let t=0; t<=1; t+=1/steps){
-          const x = Math.pow(1-t,3)*p0[0]
-                  + 3*Math.pow(1-t,2)*t*p1[0]
-                  + 3*(1-t)*t*t*p2[0]
-                  + t*t*t*p3[0];
-          const y = Math.pow(1-t,3)*p0[1]
-                  + 3*Math.pow(1-t,2)*t*p1[1]
-                  + 3*(1-t)*t*t*p2[1]
-                  + t*t*t*p3[1];
-          pts.push([x,y]);
-        }
-        return pts;
+    /* --- Other Utility Functions --- */
+    function spawnFloatingHearts() {
+      const container = document.getElementById("heartsBg");
+      const count = window.innerWidth < 600 ? 15 : 30;
+      for (let i = 0; i < count; i++) {
+        const h = document.createElement("div");
+        h.className = "floating-heart";
+        const size = 12 + Math.random() * 18;
+        h.style.width = h.style.height = `${size}px`;
+        h.style.background = ["#e57373", "#f06292", "#ff8a80"][Math.floor(Math.random() * 3)];
+        h.style.left = `${Math.random() * 100}vw`;
+        h.style.animationDelay = `${Math.random() * 6}s`;
+        h.style.animationDuration = `${5 + Math.random() * 4}s`;
+        container.appendChild(h);
       }
-      const pts1 = sample([0,-40],[-40,-80],[-120,-10],[0,70],80),
-            pts2 = sample([0,70],[120,-10],[40,-80],[0,-40],80),
-            all  = pts1.concat(pts2),
-            off  = [cx, cy2];
+    }
 
-      all.forEach((_, j) => {
-        if (j > 0) {
-          const [x1,y1] = all[j-1], [x2,y2] = all[j];
-          heartLines.push([
-            off[0] + x1*scale, off[1] + y1*scale,
-            off[0] + x2*scale, off[1] + y2*scale
-          ]);
-        }
-      });
-
-      let k = 0;
-      const hInt = setInterval(() => {
-        if (k >= heartLines.length) {
-          clearInterval(hInt);
-          ctx.globalAlpha = 0;
-          ctx.fillStyle   = '#e53935';
-          ctx.beginPath();
-          ctx.moveTo(
-            off[0] + all[0][0]*scale,
-            off[1] + all[0][1]*scale
-          );
-          all.forEach(pt =>
-            ctx.lineTo(
-              off[0] + pt[0]*scale,
-              off[1] + pt[1]*scale
-            )
-          );
-          ctx.closePath();
-          let alpha = 0;
-          const fadeFill = setInterval(() => {
-            alpha = Math.min(alpha + 0.05, 1);
-            ctx.globalAlpha = alpha;
-            ctx.fill();
-            if (alpha >= 1) {
-              clearInterval(fadeFill);
-              document.getElementById('heartCanvas').style.opacity = '1';
-            }
-          }, 50);
-          return;
-        }
-        const [x1,y1,x2,y2] = heartLines[k++];
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = '#e53935';
-        ctx.lineWidth   = 5;
-        ctx.beginPath();
-        ctx.moveTo(x1,y1);
-        ctx.lineTo(x2,y2);
-        ctx.stroke();
-      }, 10);
+    function playMusic() {
+      if (document.querySelector('iframe')) return;
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = "https://www.youtube.com/embed/oozQ4yV__Vw?autoplay=1&loop=1&playlist=oozQ4yV__Vw&controls=0&modestbranding=1&playsinline=1";
+      iframe.allow = "autoplay";
+      document.body.appendChild(iframe);
     }
   </script>
 </body>
