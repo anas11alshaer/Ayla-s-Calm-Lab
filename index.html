@@ -98,6 +98,32 @@
       transition: transform 0.3s;
     }
     .option:hover { transform: scale(1.05); }
+
+    /* Overlay for explicit play button (Safari and fallback) */
+    #musicOverlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 50;
+    }
+    #musicOverlay button {
+      padding: 14px 28px;
+      font-size: 1.4em;
+      border-radius: 8px;
+      border: none;
+      background: #81d4fa;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    /* Hidden yet valid YT player (≥200×140 px, not display:none) */
+    #hiddenYT {
+      position: fixed;
+      left: -9999px; top: 0;
+      width: 240px; height: 180px;
+      pointer-events: none;
+      opacity: 0;
+    }
   </style>
 </head>
 <body>
@@ -105,7 +131,7 @@
     <div id="passcode-screen">
       <h1>Welcome to Ayla's Calm Lab 🌸</h1>
       <input type="password" id="passcode" placeholder="Enter your passcode">
-      <button onclick="checkPasscode()">Enter</button>
+      <button id="enterBtn">Enter</button>
       <p id="error-msg"></p>
     </div>
 
@@ -121,10 +147,10 @@
   </div>
 
   <script>
-    let branchLines = [], heartLines = [];
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
     document.addEventListener('DOMContentLoaded', () => {
-      // floating hearts
+      /* ——— floating hearts ——— */
       const hb = document.getElementById('heartsBg');
       for (let i = 0; i < 30; i++) {
         const h = document.createElement('div');
@@ -135,11 +161,14 @@
         hb.appendChild(h);
       }
 
-      // passcode Enter key
+      /* Enter key on input */
       document.getElementById('passcode')
         .addEventListener('keyup', e => { if (e.key==='Enter') checkPasscode(); });
 
-      // option links
+      /* Enter button */
+      document.getElementById('enterBtn').addEventListener('click', checkPasscode);
+
+      /* Option links */
       document.getElementById('opt-motivation')
         .addEventListener('click', () => window.open(
           'https://www.youtube.com/watch?v=uvDsgjRdoKo','_blank'));
@@ -150,15 +179,14 @@
         .addEventListener('click', () => window.open(
           'https://drive.google.com/file/d/1i2LOYxns-E3Ac7cB3WAbivERKqeWEuy1/view?usp=drive_link','_blank'));
 
-      // handle resize
-      let rt;
+      /* Handle resize */
       window.addEventListener('resize', () => {
-        clearTimeout(rt);
-        rt = setTimeout(()=> {
+        clearTimeout(window._resizeTimeout);
+        window._resizeTimeout = setTimeout(() => {
           if (!document.getElementById('passcode-screen').offsetParent) {
             animateTree(); drawHeartOutline();
           }
-        },150);
+        }, 150);
       });
     });
 
@@ -174,38 +202,65 @@
     }
 
     function startAnimation() {
-      // 1) draw the tree & heart
       animateTree();
 
-      // 2) stream “Gone, Gone, Gone” via YouTube embed
+      /* All browsers need a user gesture; Safari additionally needs an explicit click */
+      if (isSafari) {
+        showPlayOverlay();
+      } else {
+        injectYT();
+      }
+    }
+
+    function showPlayOverlay() {
+      const overlay = document.createElement('div');
+      overlay.id = 'musicOverlay';
+      const btn = document.createElement('button');
+      btn.textContent = '▶ Play Music';
+      btn.onclick = () => {
+        injectYT();
+        document.body.removeChild(overlay);
+      };
+      overlay.appendChild(btn);
+      document.body.appendChild(overlay);
+    }
+
+    /* —— MUSIC: hidden‑but‑valid YT iframe —— */
+    function injectYT() {
+      if (document.getElementById('hiddenYT')) return; // already injected
       const ifr = document.createElement('iframe');
-      ifr.style.display = 'none';
-      ifr.allow = 'autoplay; encrypted-media';
+      ifr.id = 'hiddenYT';
+      ifr.width  = '240';
+      ifr.height = '180';
+      ifr.allow  = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
       ifr.src =
-        'https://www.youtube.com/embed/oozQ4yV__Vw'
-        + '?autoplay=1'
-        + '&loop=1&playlist=oozQ4yV__Vw'
-        + '&controls=0'
-        + '&modestbranding=1';
+        'https://www.youtube.com/embed/oozQ4yV__Vw' +
+        '?autoplay=1' +
+        '&loop=1&playlist=oozQ4yV__Vw' +
+        '&controls=0&modestbranding=1&playsinline=1';
       document.body.appendChild(ifr);
     }
+
+    /* ——— Tree & Heart Drawing Logic (unchanged) ——— */
+
+    let branchLines = [], heartLines = [];
 
     function animateTree() {
       const c = document.getElementById('treeCanvas'),
             ctx = c.getContext('2d'),
             dpr = window.devicePixelRatio||1;
-      c.style.width='100%'; c.style.height='100%';
-      c.width = c.clientWidth * dpr;
-      c.height= c.clientHeight* dpr;
-      ctx.scale(dpr,dpr);
+      c.style.width = '100%'; c.style.height = '100%';
+      c.width  = c.clientWidth  * dpr;
+      c.height = c.clientHeight * dpr;
+      ctx.scale(dpr, dpr);
 
       branchLines = [];
-      const cw=c.clientWidth, ch=c.clientHeight,
-            cx=cw/2, by=ch;
+      const cw = c.clientWidth, ch = c.clientHeight,
+            cx = cw/2, by = ch;
       function gen(x1,y1,len,ang,depth){
         if (!depth) return;
-        const x2 = x1+len*Math.cos(ang),
-              y2 = y1-len*Math.sin(ang);
+        const x2 = x1 + len*Math.cos(ang),
+              y2 = y1 - len*Math.sin(ang);
         branchLines.push([x1,y1,x2,y2]);
         gen(x2,y2,len*0.7,ang-0.4,depth-1);
         gen(x2,y2,len*0.7,ang+0.4,depth-1);
@@ -234,8 +289,8 @@
     function drawTreeFoliage() {
       const foliage = [];
       branchLines.forEach(([x1,y1,x2,y2]) => {
-        if (Math.random()<0.4) foliage.push({x:x2,y:y2,type:'leaf'});
-        if (Math.random()<0.2) foliage.push({x:x2,y:y2,type:'lily'});
+        if (Math.random() < 0.4) foliage.push({x:x2, y:y2, type:'leaf'});
+        if (Math.random() < 0.2) foliage.push({x:x2, y:y2, type:'lily'});
       });
       animateFoliage(foliage);
       document.getElementById('options').classList.add('visible');
@@ -279,20 +334,20 @@
     }
 
     function drawHeartOutline() {
-      heartLines.length = 0;
+      heartLines = [];
       const c = document.getElementById('heartCanvas'),
             ctx = c.getContext('2d'),
             dpr = window.devicePixelRatio||1;
       c.style.width  = '100%';
       c.style.height = '100%';
-      c.width  = c.clientWidth * dpr;
+      c.width  = c.clientWidth  * dpr;
       c.height = c.clientHeight * dpr;
-      ctx.scale(dpr,dpr);
+      ctx.scale(dpr, dpr);
 
-      const cw = c.clientWidth, ch = c.clientHeight,
-            cx = cw/2, cy = ch/2, scale = 1.5;
+      const cw= c.clientWidth, cy= c.clientHeight,
+            cx= cw/2, cy2= cy/2, scale=1.5;
       function sample(p0,p1,p2,p3,steps){
-        const pts = [];
+        const pts=[];
         for (let t=0; t<=1; t+=1/steps){
           const x = Math.pow(1-t,3)*p0[0]
                   + 3*Math.pow(1-t,2)*t*p1[0]
@@ -309,13 +364,15 @@
       const pts1 = sample([0,-40],[-40,-80],[-120,-10],[0,70],80),
             pts2 = sample([0,70],[120,-10],[40,-80],[0,-40],80),
             all  = pts1.concat(pts2),
-            off  = [cx, cy];
+            off  = [cx, cy2];
 
       all.forEach((_, j) => {
         if (j > 0) {
           const [x1,y1] = all[j-1], [x2,y2] = all[j];
-          heartLines.push([off[0]+x1*scale, off[1]+y1*scale,
-                           off[0]+x2*scale, off[1]+y2*scale]);
+          heartLines.push([
+            off[0] + x1*scale, off[1] + y1*scale,
+            off[0] + x2*scale, off[1] + y2*scale
+          ]);
         }
       });
 
@@ -323,13 +380,18 @@
       const hInt = setInterval(() => {
         if (k >= heartLines.length) {
           clearInterval(hInt);
-          // fill it in
           ctx.globalAlpha = 0;
           ctx.fillStyle   = '#e53935';
           ctx.beginPath();
-          ctx.moveTo(off[0]+all[0][0]*scale, off[1]+all[0][1]*scale);
+          ctx.moveTo(
+            off[0] + all[0][0]*scale,
+            off[1] + all[0][1]*scale
+          );
           all.forEach(pt =>
-            ctx.lineTo(off[0]+pt[0]*scale, off[1]+pt[1]*scale)
+            ctx.lineTo(
+              off[0] + pt[0]*scale,
+              off[1] + pt[1]*scale
+            )
           );
           ctx.closePath();
           let alpha = 0;
@@ -341,7 +403,7 @@
               clearInterval(fadeFill);
               document.getElementById('heartCanvas').style.opacity = '1';
             }
-          },50);
+          }, 50);
           return;
         }
         const [x1,y1,x2,y2] = heartLines[k++];
@@ -352,7 +414,7 @@
         ctx.moveTo(x1,y1);
         ctx.lineTo(x2,y2);
         ctx.stroke();
-      },10);
+      }, 10);
     }
   </script>
 </body>
