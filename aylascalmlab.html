@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ayla's Calm Lab</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom right, #e0f7fa, #fce4ec);
+    }
+    .container {
+      position: relative;
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #passcode-screen {
+      position: absolute;
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.8);
+    }
+    input[type="password"] {
+      padding: 12px; font-size: 1.2em;
+      border-radius: 8px; border: 1px solid #ccc;
+    }
+    button {
+      margin-top: 12px; padding: 10px 20px;
+      font-size: 1.1em;
+      border: none; border-radius: 8px;
+      background: #81d4fa; color: #fff;
+      cursor: pointer;
+    }
+    #error-msg { margin-top: 8px; color: #e53935; }
+
+    canvas {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+    #heartCanvas {
+      animation: beatCanvas 1s ease-in-out infinite;
+      transform-origin: center center;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+    }
+    @keyframes beatCanvas {
+      0%,100% { transform: scale(1); }
+      50%     { transform: scale(1.1); }
+    }
+
+    .hearts-bg {
+      position: absolute; width: 100%; height: 100%;
+      pointer-events: none; overflow: hidden; z-index: 0;
+    }
+    .floating-heart {
+      position: absolute; bottom: -30px;
+      width: 20px; height: 20px;
+      background: #e57373; transform: rotate(-45deg);
+      opacity: 0.8; animation: floatUp 6s linear infinite;
+    }
+    .floating-heart::before,
+    .floating-heart::after {
+      content: ''; position: absolute;
+      width: 20px; height: 20px;
+      background: #e57373; border-radius: 50%;
+    }
+    .floating-heart::before { top: -10px; left: 0; }
+    .floating-heart::after  { left: 10px; top: 0; }
+    @keyframes floatUp {
+      0%   { transform: translateY(0) scale(0.7) rotate(-45deg); opacity: 0; }
+      10%  { opacity: 0.8; }
+      100% { transform: translateY(-120vh) scale(1.1) rotate(-45deg); opacity: 0; }
+    }
+
+    /* Options styling */
+    #options {
+      position: absolute; bottom: 10%; left: 50%;
+      transform: translate(-50%, 20px);
+      opacity: 0; display: flex; gap: 20px;
+      transition: opacity 1s ease, transform 1s ease;
+      z-index: 10;
+    }
+    #options.visible {
+      opacity: 1; transform: translate(-50%, 0);
+    }
+    .option {
+      background: rgba(255,255,255,0.9);
+      padding: 12px 20px; border-radius: 8px;
+      font-size: 1.2em; color: #333;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      transition: transform 0.3s;
+    }
+    .option:hover { transform: scale(1.05); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="passcode-screen">
+      <h1>Welcome to Ayla's Calm Lab 🌸</h1>
+      <input type="password" id="passcode" placeholder="Enter your passcode">
+      <button onclick="checkPasscode()">Enter</button>
+      <p id="error-msg"></p>
+    </div>
+
+    <canvas id="treeCanvas"></canvas>
+    <canvas id="heartCanvas"></canvas>
+    <div class="hearts-bg" id="heartsBg"></div>
+
+    <div id="options">
+      <div class="option" id="opt-motivation">My Motivation for YOU</div>
+      <div class="option" id="opt-energy">A Boost of Energy</div>
+      <div class="option" id="opt-heart">You can have my HEART</div>
+    </div>
+  </div>
+
+  <script>
+    let branchLines = [], heartLines = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // floating hearts
+      const hb = document.getElementById('heartsBg');
+      for (let i = 0; i < 30; i++) {
+        const h = document.createElement('div');
+        h.className = 'floating-heart';
+        h.style.left = `${Math.random()*100}vw`;
+        h.style.animationDelay = `${Math.random()*6}s`;
+        h.style.animationDuration = `${5+Math.random()*4}s`;
+        hb.appendChild(h);
+      }
+
+      // passcode Enter key
+      document.getElementById('passcode')
+        .addEventListener('keyup', e => { if (e.key==='Enter') checkPasscode(); });
+
+      // option links
+      document.getElementById('opt-motivation')
+        .addEventListener('click', () => window.open(
+          'https://www.youtube.com/watch?v=uvDsgjRdoKo','_blank'));
+      document.getElementById('opt-energy')
+        .addEventListener('click', () => window.open(
+          'https://www.instagram.com/reel/DH8KlgWMIGX/?utm_source=ig_web_copy_link','_blank'));
+      document.getElementById('opt-heart')
+        .addEventListener('click', () => window.open(
+          'https://drive.google.com/file/d/1i2LOYxns-E3Ac7cB3WAbivERKqeWEuy1/view?usp=drive_link','_blank'));
+
+      // handle resize
+      let rt;
+      window.addEventListener('resize', () => {
+        clearTimeout(rt);
+        rt = setTimeout(()=> {
+          if (!document.getElementById('passcode-screen').offsetParent) {
+            animateTree(); drawHeartOutline();
+          }
+        },150);
+      });
+    });
+
+    function checkPasscode() {
+      const inp = document.getElementById('passcode');
+      const err = document.getElementById('error-msg');
+      if (inp.value === '2607') {
+        document.getElementById('passcode-screen').style.display = 'none';
+        startAnimation();
+      } else {
+        err.textContent = 'Wrong mixture! Try again 💊';
+      }
+    }
+
+    function startAnimation() {
+      // 1) draw the tree & heart
+      animateTree();
+
+      // 2) stream “Gone, Gone, Gone” via YouTube embed
+      const ifr = document.createElement('iframe');
+      ifr.style.display = 'none';
+      ifr.allow = 'autoplay; encrypted-media';
+      ifr.src =
+        'https://www.youtube.com/embed/oozQ4yV__Vw'
+        + '?autoplay=1'
+        + '&loop=1&playlist=oozQ4yV__Vw'
+        + '&controls=0'
+        + '&modestbranding=1';
+      document.body.appendChild(ifr);
+    }
+
+    function animateTree() {
+      const c = document.getElementById('treeCanvas'),
+            ctx = c.getContext('2d'),
+            dpr = window.devicePixelRatio||1;
+      c.style.width='100%'; c.style.height='100%';
+      c.width = c.clientWidth * dpr;
+      c.height= c.clientHeight* dpr;
+      ctx.scale(dpr,dpr);
+
+      branchLines = [];
+      const cw=c.clientWidth, ch=c.clientHeight,
+            cx=cw/2, by=ch;
+      function gen(x1,y1,len,ang,depth){
+        if (!depth) return;
+        const x2 = x1+len*Math.cos(ang),
+              y2 = y1-len*Math.sin(ang);
+        branchLines.push([x1,y1,x2,y2]);
+        gen(x2,y2,len*0.7,ang-0.4,depth-1);
+        gen(x2,y2,len*0.7,ang+0.4,depth-1);
+      }
+      gen(cx,by,ch/4,Math.PI/2,10);
+
+      ctx.strokeStyle = '#6d4c41';
+      ctx.lineWidth   = 8;
+      ctx.lineCap     = 'round';
+      let i = 0;
+      const iv = setInterval(() => {
+        if (i >= branchLines.length) {
+          clearInterval(iv);
+          drawTreeFoliage();
+          drawHeartOutline();
+          return;
+        }
+        const [x1,y1,x2,y2] = branchLines[i++];
+        ctx.beginPath();
+        ctx.moveTo(x1,y1);
+        ctx.lineTo(x2,y2);
+        ctx.stroke();
+      }, 10);
+    }
+
+    function drawTreeFoliage() {
+      const foliage = [];
+      branchLines.forEach(([x1,y1,x2,y2]) => {
+        if (Math.random()<0.4) foliage.push({x:x2,y:y2,type:'leaf'});
+        if (Math.random()<0.2) foliage.push({x:x2,y:y2,type:'lily'});
+      });
+      animateFoliage(foliage);
+      document.getElementById('options').classList.add('visible');
+    }
+
+    function animateFoliage(items) {
+      const c = document.getElementById('treeCanvas'),
+            ctx = c.getContext('2d');
+      items.forEach((f,i) => {
+        setTimeout(() => {
+          let alpha = 0;
+          const fade = setInterval(() => {
+            alpha = Math.min(alpha + 0.15, 1);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(f.x, f.y);
+            if (f.type === 'leaf') {
+              ctx.rotate(Math.random()*Math.PI);
+              ctx.fillStyle = '#4caf50';
+              ctx.beginPath();
+              ctx.ellipse(0,0,8,4,0,0,2*Math.PI);
+              ctx.fill();
+            } else {
+              for (let p=0; p<6; p++){
+                ctx.rotate(Math.PI/3);
+                ctx.beginPath();
+                ctx.fillStyle = '#fff';
+                ctx.ellipse(0,10,4,12,0,0,2*Math.PI);
+                ctx.fill();
+              }
+              ctx.beginPath();
+              ctx.arc(0,0,5,0,2*Math.PI);
+              ctx.fillStyle = '#ffeb3b';
+              ctx.fill();
+            }
+            ctx.restore();
+            if (alpha >= 1) clearInterval(fade);
+          }, 30);
+        }, i*80 + 100);
+      });
+    }
+
+    function drawHeartOutline() {
+      heartLines.length = 0;
+      const c = document.getElementById('heartCanvas'),
+            ctx = c.getContext('2d'),
+            dpr = window.devicePixelRatio||1;
+      c.style.width  = '100%';
+      c.style.height = '100%';
+      c.width  = c.clientWidth * dpr;
+      c.height = c.clientHeight * dpr;
+      ctx.scale(dpr,dpr);
+
+      const cw = c.clientWidth, ch = c.clientHeight,
+            cx = cw/2, cy = ch/2, scale = 1.5;
+      function sample(p0,p1,p2,p3,steps){
+        const pts = [];
+        for (let t=0; t<=1; t+=1/steps){
+          const x = Math.pow(1-t,3)*p0[0]
+                  + 3*Math.pow(1-t,2)*t*p1[0]
+                  + 3*(1-t)*t*t*p2[0]
+                  + t*t*t*p3[0];
+          const y = Math.pow(1-t,3)*p0[1]
+                  + 3*Math.pow(1-t,2)*t*p1[1]
+                  + 3*(1-t)*t*t*p2[1]
+                  + t*t*t*p3[1];
+          pts.push([x,y]);
+        }
+        return pts;
+      }
+      const pts1 = sample([0,-40],[-40,-80],[-120,-10],[0,70],80),
+            pts2 = sample([0,70],[120,-10],[40,-80],[0,-40],80),
+            all  = pts1.concat(pts2),
+            off  = [cx, cy];
+
+      all.forEach((_, j) => {
+        if (j > 0) {
+          const [x1,y1] = all[j-1], [x2,y2] = all[j];
+          heartLines.push([off[0]+x1*scale, off[1]+y1*scale,
+                           off[0]+x2*scale, off[1]+y2*scale]);
+        }
+      });
+
+      let k = 0;
+      const hInt = setInterval(() => {
+        if (k >= heartLines.length) {
+          clearInterval(hInt);
+          // fill it in
+          ctx.globalAlpha = 0;
+          ctx.fillStyle   = '#e53935';
+          ctx.beginPath();
+          ctx.moveTo(off[0]+all[0][0]*scale, off[1]+all[0][1]*scale);
+          all.forEach(pt =>
+            ctx.lineTo(off[0]+pt[0]*scale, off[1]+pt[1]*scale)
+          );
+          ctx.closePath();
+          let alpha = 0;
+          const fadeFill = setInterval(() => {
+            alpha = Math.min(alpha + 0.05, 1);
+            ctx.globalAlpha = alpha;
+            ctx.fill();
+            if (alpha >= 1) {
+              clearInterval(fadeFill);
+              document.getElementById('heartCanvas').style.opacity = '1';
+            }
+          },50);
+          return;
+        }
+        const [x1,y1,x2,y2] = heartLines[k++];
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#e53935';
+        ctx.lineWidth   = 5;
+        ctx.beginPath();
+        ctx.moveTo(x1,y1);
+        ctx.lineTo(x2,y2);
+        ctx.stroke();
+      },10);
+    }
+  </script>
+</body>
+</html>
